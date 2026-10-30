@@ -13,6 +13,7 @@ from typing import List, Optional
 
 from urllib.parse import urlparse
 
+from azure.core._cloud_environment import from_environment as cloud_environment_from_environment
 from azure.core.credentials import AccessTokenInfo
 from azure.core.exceptions import ClientAuthenticationError
 from .._constants import (
@@ -87,8 +88,35 @@ def normalize_authority(authority: str) -> str:
 
 
 def get_default_authority() -> str:
+    # AZURE_CLOUD describes the whole cloud and so takes precedence over the authority-only
+    # AZURE_AUTHORITY_HOST. When it is unset the pre-existing behaviour is preserved exactly.
+    cloud = cloud_environment_from_environment()
+    if cloud is not None:
+        return normalize_authority(cloud.authority_host)
     authority = os.environ.get(EnvironmentVariables.AZURE_AUTHORITY_HOST, KnownAuthorities.AZURE_PUBLIC_CLOUD)
     return normalize_authority(authority)
+
+
+def disable_instance_discovery_from_environment() -> Optional[bool]:
+    """Read AZURE_DISABLE_INSTANCE_DISCOVERY.
+
+    :rtype: bool or None
+    :return: the parsed value, or None when the variable isn't set.
+    :raises ValueError: when the value can't be parsed as a boolean.
+    """
+    value = os.environ.get(EnvironmentVariables.AZURE_DISABLE_INSTANCE_DISCOVERY)
+    if value is None or not value.strip():
+        return None
+    normalized = value.strip().lower()
+    if normalized in ("true", "1"):
+        return True
+    if normalized in ("false", "0"):
+        return False
+    raise ValueError(
+        "Invalid value {!r} for {}. Set it to true or false.".format(
+            value, EnvironmentVariables.AZURE_DISABLE_INSTANCE_DISCOVERY
+        )
+    )
 
 
 def validate_scope(scope: str) -> None:

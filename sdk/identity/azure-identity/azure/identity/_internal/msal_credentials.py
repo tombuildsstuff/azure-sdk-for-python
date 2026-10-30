@@ -9,7 +9,13 @@ from typing_extensions import Self
 import msal
 
 from .msal_client import MsalClient
-from .utils import get_default_authority, normalize_authority, resolve_tenant, validate_tenant_id
+from .utils import (
+    disable_instance_discovery_from_environment,
+    get_default_authority,
+    normalize_authority,
+    resolve_tenant,
+    validate_tenant_id,
+)
 from .._constants import EnvironmentVariables
 from .._persistent_cache import _load_persistent_cache
 
@@ -34,6 +40,11 @@ class MsalCredential:  # pylint: disable=too-many-instance-attributes
         enable_support_logging: Optional[bool] = None,
         **kwargs: Any,
     ) -> None:
+        # Application code wins: an explicit disable_instance_discovery is honoured as given.
+        # Otherwise AZURE_DISABLE_INSTANCE_DISCOVERY decides, so a single variable covers every
+        # credential type.
+        if disable_instance_discovery is None:
+            disable_instance_discovery = disable_instance_discovery_from_environment()
         self._instance_discovery = None if disable_instance_discovery is None else not disable_instance_discovery
         self._authority = normalize_authority(authority) if authority else get_default_authority()
         self._regional_authority = os.environ.get(EnvironmentVariables.AZURE_REGIONAL_AUTHORITY_NAME)

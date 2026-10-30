@@ -27,6 +27,7 @@ from typing import Mapping, MutableMapping, Optional, Type, Union, cast, Dict, A
 import re
 import logging
 from azure.core import AzureClouds
+from azure.core._cloud_environment import from_environment as _cloud_from_environment
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -229,6 +230,16 @@ def get_arm_endpoints(cloud_setting: AzureClouds) -> Dict[str, Any]:
     :return: The ARM endpoint and ARM credential scopes.
     :rtype: dict[str, Any]
     """
+    # AZURE_CLOUD describes the whole cloud and so takes precedence over the AzureClouds enum,
+    # which cannot express a custom cloud. When it is unset the pre-existing behaviour below is
+    # preserved exactly.
+    _env_cloud = _cloud_from_environment()
+    if _env_cloud is not None and _env_cloud.is_custom:
+        return {
+            "resource_manager": _env_cloud.resource_manager_endpoint,
+            "credential_scopes": ["{}/.default".format(_env_cloud.resource_manager_audience)],
+        }
+
     if cloud_setting == AzureClouds.AZURE_CHINA_CLOUD:
         return {
             "resource_manager": "https://management.chinacloudapi.cn/",
